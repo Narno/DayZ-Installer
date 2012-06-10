@@ -1,6 +1,6 @@
 # DayZ Mod Setup
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-03
+# @version 2012-06-10
 # @author Arnaud Ligny <arnaud@ligny.org>
 
 Name "DayZ Mod"
@@ -8,27 +8,35 @@ Name "DayZ Mod"
 SetCompressor /SOLID lzma
 
 # General Symbol Definitions
-!define VERSION 0.0.0.2
+!define OUTFILE "DayZ-Mod-Installer.exe"
+!define VERSION 0.0.1.0
 !define COMPANY "DayZ Team"
 !define URL http://www.dayzmod.com
 
 # DayZ Symbol Definitions
-!define INSTALLER_URL        "http://cdn.armafiles.info/installer"
-!define INSTALLER_FILES_NAME "installer_files.cfg"
-!define INSTALLER_FILES_URL  "${INSTALLER_URL}/${INSTALLER_FILES_NAME}"
+!define CDN_URL_SWEDEN     "http://cdn.armafiles.info"
+!define CDN_URL_USA        "http://us.armafiles.info"
+!define CDN_URL_GERMANY    "http://mirror.tritnaha.com"
+!define CDN_URL            ${CDN_URL_SWEDEN}
+!define CHECKSUMS_FILENAME "md5checksums.txt"
+!define ARCHIVE_EXT        ".rar"
+!define TEXT_EXT           ".txt"
 !define REGPATH32  "SOFTWARE\Bohemia Interactive Studio\ArmA 2 OA"
 !define REGPATH64  "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2 OA"
 !define REGKEYMAIN "main"
 
 # MUI Symbol Definitions
-!define MUI_ICON "Graphics\Icons\DayZ.ico"
+!define MUI_ICON "Graphics\Icons\Default.ico"
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_RIGHT
+!define MUI_HEADERIMAGE_BITMAP "Graphics\Bitmaps\Header.bmp"
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 
 # Included files
-!include TextFunc.nsh
-!include LogicLib.nsh
 !include Sections.nsh
 !include MUI.nsh
+!include LogicLib.nsh
+!include TextFunc.nsh
 !include WordFunc.nsh
 
 # Installer pages
@@ -40,7 +48,7 @@ SetCompressor /SOLID lzma
 !insertmacro MUI_LANGUAGE English
 
 # Installer attributes
-Outfile "DayZ-Mod-Installer.exe"
+Outfile "${OUTFILE}"
 BrandingText "Setup created by Narno with NSIS ${NSIS_VERSION}"
 SpaceTexts none
 CRCCheck on
@@ -58,59 +66,101 @@ VIAddVersionKey LegalCopyright "${COMPANY}"
 Var /GLOBAL RegPath
 Var /GLOBAL GamePath
 
+# Functions
+!include DayZMod.nsh
+
 # Installer sections
 Section -Main SEC0000
     SetOverwrite on
     SetDetailsView show
     SetDetailsPrint both
+    SetOutPath "$INSTDIR\@DayZ"
     
-    # Create temporary directory for downloads
+    # Installer files
+    ;DetailPrint "Extract: 7zip"
     SetDetailsPrint none
-    CreateDirectory "$TEMP\DayZ"
-    SetDetailsPrint both
+    SetOutPath "$INSTDIR\@DayZ\Installer"
+    ;File /nonfatal ${OUTFILE}
+    # 7zip required (7z.dll and 7z.exe to unrar files)
+    File /r "7zip"
+    SetDetailsPrint lastused
     
-    # Download 'dayz_readme.txt', 'dayz_changelog.txt', 'installer_cnc.cfg', 
-    # 'installer_files.cfg' and get list of PBO files
-    SetOutPath "$INSTDIR"
-    NSISdl::download /TIMEOUT=30000 "${INSTALLER_URL}/dayz_readme.txt" "dayz_readme.txt"
-    NSISdl::download /TIMEOUT=30000 "${INSTALLER_URL}/dayz_changelog.txt" "dayz_changelog.txt"
-    NSISdl::download /TIMEOUT=30000 "${INSTALLER_URL}/installer_cnc.cfg" "installer_cnc.cfg"
-    NSISdl::download /TIMEOUT=30000 "${INSTALLER_FILES_URL}" "${INSTALLER_FILES_NAME}"
-    Pop $R0
-    StrCmp $R0 "success" +3
-        MessageBox MB_OK "Download failed (${INSTALLER_FILES_NAME}): $R0"
-        Quit
-    
+    # Getting "md5checksums.txt" file
+    SetDetailsPrint none
+    SetOutPath "$INSTDIR\@DayZ\Downloads"
+    SetDetailsPrint lastused
+    DetailPrint "Get files list from: ${CDN_URL}"
+    inetc::get /CAPTION "Downloading..." /BANNER "Get files list from ${CDN_URL}" \
+               "${CDN_URL}/${CHECKSUMS_FILENAME}" ${CHECKSUMS_FILENAME}
+    ${LineSum} ${CHECKSUMS_FILENAME} $7
+    ;DetailPrint "Files found: $7"
     # Download and install each PBO file
-    SetDetailsPrint none
-    SetOutPath "$INSTDIR\Addons"
-    SetDetailsPrint both
     Var /GLOBAL i
-    ${LineSum} "$INSTDIR\${INSTALLER_FILES_NAME}" $0
-    ${ForEach} $i 1 $0 + 1
-    ;${ForEach} $i 1 1 + 1 ; download only 1 file for DEBUG
-        ${LineRead} "$INSTDIR\${INSTALLER_FILES_NAME}" $i $1
-        ${TrimNewLines} $1 $1
-        DetailPrint "Downloading $1"
-        NSISdl::download /TIMEOUT=30000 "${INSTALLER_URL}/$1" "$TEMP\DayZ\$1"
-        Pop $R0
-        StrCmp $R0 "success" +3
-            DetailPrint "Download failed: $R0"
-            Quit
-        DetailPrint "Installing $1"
-        Nsis7z::ExtractWithDetails "$TEMP\DayZ\$1" "Installing %s"
+    ${ForEach} $i 1 $7 + 1
+        ${LineRead} "$INSTDIR\@DayZ\Downloads\${CHECKSUMS_FILENAME}" $i $1
+        ${TrimNewLines} $1 $1 ;"57904b8a2f96c2cc7b6cb7b0ceb87e51  dayz_code_v1.7.0.rar"
+        ;DetailPrint "Line: $1"
+        ${WordFind} $1 "  " "-2" $R1 ; find hash
+        ;DetailPrint "hash: $R0"
+        ${WordFind} $1 "  " "+2" $R2 ; find file
+        ;DetailPrint "file: $R1"
+        # find each RAR file and download it
+        ${WordFind} $R2 ${ARCHIVE_EXT} "E+1{" $R0
+        IfErrors rarNotFound rarFound
+        rarFound:
+            # Downloading file
+            DetailPrint "Download: $R2"
+            inetc::get /CAPTION $R2 /POPUP "" \
+                       "${CDN_URL}/$R2" $R2
+            Pop $R0
+            StrCmp $R0 "OK" +3
+                DetailPrint "Download failed: $R0"
+                Abort
+            # compare hash
+            md5dll::GetMD5File $R2
+            Pop $0
+            StrCmp $0 $R1 +5
+                DetailPrint "MD5sum doesn't match for $R2:"
+                DetailPrint "- Expected: $R1"
+                DetailPrint "- Downloaded: $0"
+                Abort
+            # Uncompressing
+            ;DetailPrint "Uncompress: $R2"
+            nsExec::ExecToStack '"$INSTDIR\@DayZ\Installer\7zip\7z.exe" e $R2 -aoa -o"$INSTDIR\@DayZ\Addons"'
+            Pop $0 # return value/error/timeout
+            Pop $1
+            StrCmp $0 "0" +3
+                DetailPrint "Uncompress failed: $1"
+                Abort
+            Goto rarEnd
+        rarNotFound:
+            # find each TXT file and download it
+            ${WordFind} $R2 ${TEXT_EXT} "E+1{" $R0
+            IfErrors txtNotFound txtFound
+            txtFound:
+                # Downloading file
+                DetailPrint "Download: $R2"
+                inetc::get /CAPTION "$R2" /POPUP "" "${CDN_URL}/$R2" $R2
+                Pop $R0
+                StrCmp $R0 "OK" +3
+                    DetailPrint "Download failed: $R0"
+                    Abort
+                SetDetailsPrint none
+                CopyFiles $R2 "$INSTDIR\@DayZ\$R2"
+                SetDetailsPrint lastused
+                Goto txtEnd
+            txtNotFound:
+                ;
+            txtEnd:
+        rarEnd:
     ${Next}
     
     # Create desktop shortcut
     SetDetailsPrint none
-    SetOutPath "$INSTDIR"
-    File "Graphics\Icons\DayZ.ico"
-    SetDetailsPrint both
-    CreateShortCut "$DESKTOP\$(^Name).lnk" "$GamePath\ArmA2OA.exe" "-mod=@DayZ -nosplah" "$INSTDIR\DayZ.ico"
-    
-    # Cleaning temp
-    SetDetailsPrint none
-    RmDir /r "$TEMP\DayZ"
+    SetOutPath "$INSTDIR\@DayZ"
+    File /oname=DayZ.ico "Graphics\Icons\Default.ico"
+    SetDetailsPrint lastused
+    CreateShortCut "$DESKTOP\$(^Name).lnk" "$GamePath\ArmA2OA.exe" "-mod=@DayZ -nosplah" "$INSTDIR\@DayZ\DayZ.ico"
 SectionEnd
 
 # Installer functions
@@ -127,42 +177,16 @@ Function .onInit
         StrCpy $RegPath "${REGPATH64}"
     End32Bitvs64BitCheck:
         ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
-        StrCpy $INSTDIR "$GamePath\@DayZ"
+        # Set Install Dir
+        StrCpy $INSTDIR "$GamePath"
+FunctionEnd
+
+Function .onVerifyInstDir
+    IfFileExists "$INSTDIR\ArmA2OA.exe" +2
+        Abort
 FunctionEnd
 
 Function preDetect
-    Call detectArma2
-    Call detectMod
-FunctionEnd
-
-Function detectArma2
-    ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
-    StrCmp $GamePath "" 0 +3
-        MessageBox MB_OK|MB_ICONSTOP "Can't install DayZ Mod: Arma2 AO not found on your system!"
-        Quit
-FunctionEnd
-
-Function detectMod
-    Call getLastVerionNumber
-    Call getCurrentVerionNumber
-    ${VersionCompare} $1 $2 $R0
-    StrCmp $R0 "0" 0 +3 ; =
-        MessageBox MB_OK "Last version ($1) of DayZ Mod already installed."
-        Return
-    StrCmp $R0 "1" 0 +3 ; <
-        MessageBox MB_OK "New version of DayZ Mod ($1) available."
-        Return
-FunctionEnd
-
-Function getLastVerionNumber
-    NSISdl::download /TIMEOUT=30000 "${INSTALLER_URL}/installer_cnc.cfg" "$TEMP\installer_cnc.cfg"
-    ${ConfigRead} "$TEMP\installer_cnc.cfg" "VERSION=" $R0
-    ;MessageBox MB_OK "Last version: $R0"
-    StrCpy $1 $R0
-FunctionEnd
-
-Function getCurrentVerionNumber
-    ${ConfigRead} "$INSTDIR\installer_cnc.cfg" "VERSION=" $R0
-    ;MessageBox MB_OK "Current version: $R0"
-    StrCpy $2 $R0
+    Call detectArma2CO
+    Call detectDayZMod
 FunctionEnd
