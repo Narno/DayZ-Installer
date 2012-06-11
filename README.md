@@ -12,6 +12,18 @@ Features
 * Checks [MD5 sums](http://en.wikipedia.org/wiki/Md5sum) of each [RAR archive](http://cdn.armafiles.info/md5checksums.txt)
 * Creates a desktop shortcut
 
+Download
+-----------------------------
+
+**[DayZ-Mod-Installer.exe](http://goo.gl/Sv23d)** (beta 1)
+
+Screenshots
+-----------------------------
+
+![DayZ-Mod-Installer-0.0.1.0.png](http://goo.gl/PzeY5 "DayZ-Mod-Installer-0.0.1.0.png")
+
+[All screenshots](http://goo.gl/Ru3IT)
+
 Requirements
 -----------------------------
 
@@ -32,13 +44,3 @@ Author
 -----------------------------
 
 Created by Arnaud Ligny aka Narno, http://narno.github.com
-
-Download
------------------------------
-
-[DayZ-Mod-Installer.exe](http://goo.gl/Sv23d)
-
-Screenshots
------------------------------
-
-![DayZ-Mod-Installer-0.0.1.0.png](http://goo.gl/PzeY5 "DayZ-Mod-Installer-0.0.1.0.png")
