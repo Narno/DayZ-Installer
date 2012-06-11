@@ -14,8 +14,8 @@ SetCompressor /SOLID lzma
 !define URL http://www.dayzmod.com
 
 # DayZ Symbol Definitions
-!define CDN_URL_SWEDEN     "http://cdn.armafiles.info"
 !define CDN_URL_USA        "http://us.armafiles.info"
+!define CDN_URL_SWEDEN     "http://cdn.armafiles.info"
 !define CDN_URL_GERMANY    "http://mirror.tritnaha.com"
 !define CDN_URL            ${CDN_URL_SWEDEN}
 !define CHECKSUMS_FILENAME "md5checksums.txt"
@@ -39,9 +39,14 @@ SetCompressor /SOLID lzma
 !include TextFunc.nsh
 !include WordFunc.nsh
 
+# Reserved Files
+ReserveFile "DayZMod-Mirror.ini"
+!insertmacro MUI_RESERVEFILE_INSTALLOPTIONS
+
 # Installer pages
 !define MUI_PAGE_CUSTOMFUNCTION_PRE preDetect
 !insertmacro MUI_PAGE_DIRECTORY
+Page custom PageChooseMirror PageLeaveChooseMirror
 !insertmacro MUI_PAGE_INSTFILES
 
 # Installer languages
@@ -65,9 +70,30 @@ VIAddVersionKey LegalCopyright "${COMPANY}"
 
 Var /GLOBAL RegPath
 Var /GLOBAL GamePath
+Var /GLOBAL CdnUrl
 
 # Functions
 !include DayZMod.nsh
+
+# Installer functions
+Function .onInit
+    InitPluginsDir
+    # Windows 32 or 64?
+    IfFileExists $WINDIR\SYSWOW64\*.* Is64bit Is32bit
+    Is32bit:
+        SetRegView 32
+        StrCpy $RegPath "${REGPATH32}"
+        GOTO End32Bitvs64BitCheck
+    Is64bit:
+        SetRegView 64
+        StrCpy $RegPath "${REGPATH64}"
+    End32Bitvs64BitCheck:
+        ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
+        # Set Install Dir
+        StrCpy $INSTDIR "$GamePath"
+    # Custom Pages
+    !insertmacro MUI_INSTALLOPTIONS_EXTRACT "DayZMod-Mirror.ini"
+FunctionEnd
 
 # Installer sections
 Section -Main SEC0000
@@ -89,9 +115,15 @@ Section -Main SEC0000
     SetDetailsPrint none
     SetOutPath "$INSTDIR\@DayZ\Downloads"
     SetDetailsPrint lastused
-    DetailPrint "Get files list from: ${CDN_URL}"
-    inetc::get /CAPTION "Downloading..." /BANNER "Get files list from ${CDN_URL}" \
-               "${CDN_URL}/${CHECKSUMS_FILENAME}" ${CHECKSUMS_FILENAME}
+    DetailPrint "Get files list from: $CdnUrl"
+    ;MessageBox MB_OK "DEBUG: '$CdnUrl/${CHECKSUMS_FILENAME}'"    
+    inetc::get /CAPTION "Downloading..." /BANNER "Get files list from $CdnUrl" \
+               "$CdnUrl/${CHECKSUMS_FILENAME}" ${CHECKSUMS_FILENAME} \
+               /END
+    Pop $R0
+    StrCmp $R0 "OK" +3
+        DetailPrint "Server unavailable: $R0"
+        Abort
     ${LineSum} ${CHECKSUMS_FILENAME} $7
     ;DetailPrint "Files found: $7"
     # Download and install each PBO file
@@ -111,7 +143,8 @@ Section -Main SEC0000
             # Downloading file
             DetailPrint "Download: $R2"
             inetc::get /CAPTION $R2 /POPUP "" \
-                       "${CDN_URL}/$R2" $R2
+                       "$CdnUrl/$R2" $R2 \
+                       /END
             Pop $R0
             StrCmp $R0 "OK" +3
                 DetailPrint "Download failed: $R0"
@@ -140,7 +173,9 @@ Section -Main SEC0000
             txtFound:
                 # Downloading file
                 DetailPrint "Download: $R2"
-                inetc::get /CAPTION "$R2" /POPUP "" "${CDN_URL}/$R2" $R2
+                inetc::get /CAPTION "$R2" /POPUP "" \
+                           "$CdnUrl/$R2" $R2 \
+                           /END
                 Pop $R0
                 StrCmp $R0 "OK" +3
                     DetailPrint "Download failed: $R0"
@@ -163,30 +198,32 @@ Section -Main SEC0000
     CreateShortCut "$DESKTOP\$(^Name).lnk" "$GamePath\ArmA2OA.exe" "-mod=@DayZ -nosplah" "$INSTDIR\@DayZ\DayZ.ico"
 SectionEnd
 
-# Installer functions
-Function .onInit
-    InitPluginsDir
-    # Windows 32 or 64?
-    IfFileExists $WINDIR\SYSWOW64\*.* Is64bit Is32bit
-    Is32bit:
-        SetRegView 32
-        StrCpy $RegPath "${REGPATH32}"
-        GOTO End32Bitvs64BitCheck
-    Is64bit:
-        SetRegView 64
-        StrCpy $RegPath "${REGPATH64}"
-    End32Bitvs64BitCheck:
-        ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
-        # Set Install Dir
-        StrCpy $INSTDIR "$GamePath"
+Function PageChooseMirror
+    !insertmacro MUI_HEADER_TEXT "Choose Source Location" "Choose the mirror server closest to you"
+    !insertmacro MUI_INSTALLOPTIONS_DISPLAY "DayZMod-Mirror.ini"
 FunctionEnd
 
-Function .onVerifyInstDir
-    IfFileExists "$INSTDIR\ArmA2OA.exe" +2
-        Abort
+Function PageLeaveChooseMirror
+    !insertmacro MUI_INSTALLOPTIONS_READ $0 "DayZMod-Mirror.ini" "Field 1" "State"
+    ;MessageBox MB_OK "DEBUG: $0"
+    StrCpy $CdnUrl $0
 FunctionEnd
 
-Function preDetect
-    Call detectArma2CO
-    Call detectDayZMod
-FunctionEnd
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

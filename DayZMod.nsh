@@ -3,6 +3,26 @@
 # @version 2012-06-10
 # @author Arnaud Ligny <arnaud@ligny.org>
 
+Var /GLOBAL ModLastVersionNumber
+Var /GLOBAL ModCurrentVersionNumber
+
+Function .onVerifyInstDir
+    IfFileExists "$INSTDIR\ArmA2OA.exe" +2
+        Abort
+FunctionEnd
+
+Function preDetect
+    Call detectArma2CO
+    Call detectDayZMod
+FunctionEnd
+
+Function detectArma2CO
+    ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
+    StrCmp $GamePath "" 0 +3
+        MessageBox MB_OK|MB_ICONSTOP "Can't install DayZ Mod: Arma2 AO not found on your system!"
+        Quit
+FunctionEnd
+
 !define getItemVersionNumber "!insertmacro getItemVersionNumber"
 !macro getItemVersionNumber File Item
     Push "${File}" ; md5checksums.txt
@@ -34,19 +54,11 @@ Function getItemVersionNumber
     Pop $0
 FunctionEnd
 
-Function detectArma2CO
-    ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
-    StrCmp $GamePath "" 0 +3
-        MessageBox MB_OK|MB_ICONSTOP "Can't install DayZ Mod: Arma2 AO not found on your system!"
-        Quit
-FunctionEnd
-
-Var /GLOBAL ModLastVersionNumber
-Var /GLOBAL ModCurrentVersionNumber
 Function detectDayZMod
     # Last version
     inetc::get /CAPTION "Downloading..." /BANNER "Check for update" \
-               "${CDN_URL}/${CHECKSUMS_FILENAME}" "$TEMP\${CHECKSUMS_FILENAME}"
+               "${CDN_URL}/${CHECKSUMS_FILENAME}" "$TEMP\${CHECKSUMS_FILENAME}" \
+               /END
     ${getItemVersionNumber} "$TEMP\${CHECKSUMS_FILENAME}" "dayz_code"
     StrCpy $ModLastVersionNumber $R0
     StrCpy $R0 ""
