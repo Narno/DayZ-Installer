@@ -1,6 +1,6 @@
 # DayZ Mod Setup
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-10
+# @version 2012-06-22
 # @author Arnaud Ligny <arnaud@ligny.org>
 
 Name "DayZ Mod"
@@ -9,15 +9,11 @@ SetCompressor /SOLID lzma
 
 # General Symbol Definitions
 !define OUTFILE "DayZ-Mod-Installer.exe"
-!define VERSION 0.0.1.0
+!define VERSION 0.0.1.2
 !define COMPANY "DayZ Team"
 !define URL http://www.dayzmod.com
 
 # DayZ Symbol Definitions
-!define CDN_URL_USA        "http://us.armafiles.info"
-!define CDN_URL_SWEDEN     "http://cdn.armafiles.info"
-!define CDN_URL_GERMANY    "http://mirror.tritnaha.com"
-!define CDN_URL            ${CDN_URL_SWEDEN}
 !define CHECKSUMS_FILENAME "md5checksums.txt"
 !define ARCHIVE_EXT        ".rar"
 !define TEXT_EXT           ".txt"
@@ -29,7 +25,7 @@ SetCompressor /SOLID lzma
 !define MUI_ICON "Graphics\Icons\Default.ico"
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_RIGHT
-!define MUI_HEADERIMAGE_BITMAP "Graphics\Bitmaps\Header.bmp"
+!define MUI_HEADERIMAGE_BITMAP "Graphics\Bitmaps\Header_Right.bmp"
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 
 # Included files
@@ -40,7 +36,8 @@ SetCompressor /SOLID lzma
 !include WordFunc.nsh
 
 # Reserved Files
-ReserveFile "DayZMod-Mirror.ini"
+ReserveFile "DayZMod.ini"
+ReserveFile "DayZMod-PageSelectMirror.ini"
 !insertmacro MUI_RESERVEFILE_INSTALLOPTIONS
 
 # Installer pages
@@ -71,13 +68,13 @@ VIAddVersionKey LegalCopyright "${COMPANY}"
 Var /GLOBAL RegPath
 Var /GLOBAL GamePath
 Var /GLOBAL CdnUrl
+Var /GLOBAL CdnSelected
 
 # Functions
 !include DayZMod.nsh
 
-# Installer functions
-Function .onInit
-    InitPluginsDir
+# On Init
+Function .onInit   
     # Windows 32 or 64?
     IfFileExists $WINDIR\SYSWOW64\*.* Is64bit Is32bit
     Is32bit:
@@ -91,8 +88,13 @@ Function .onInit
         ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
         # Set Install Dir
         StrCpy $INSTDIR "$GamePath"
-    # Custom Pages
-    !insertmacro MUI_INSTALLOPTIONS_EXTRACT "DayZMod-Mirror.ini"
+    # Plugins
+    InitPluginsDir
+    !insertmacro MUI_INSTALLOPTIONS_EXTRACT "DayZMod.ini"
+    !insertmacro MUI_INSTALLOPTIONS_EXTRACT "DayZMod-PageSelectMirror.ini"
+    # Default CDN
+    ReadINIStr $0 "$PLUGINSDIR\DayZMod.ini" "Mirrors" "Default"
+    StrCpy $CdnUrl $0
 FunctionEnd
 
 # Installer sections
@@ -115,10 +117,10 @@ Section -Main SEC0000
     SetDetailsPrint none
     SetOutPath "$INSTDIR\@DayZ\Downloads"
     SetDetailsPrint lastused
-    DetailPrint "Get files list from: $CdnUrl"
-    ;MessageBox MB_OK "DEBUG: '$CdnUrl/${CHECKSUMS_FILENAME}'"    
-    inetc::get /CAPTION "Downloading..." /BANNER "Get files list from $CdnUrl" \
-               "$CdnUrl/${CHECKSUMS_FILENAME}" ${CHECKSUMS_FILENAME} \
+    DetailPrint "Get files list from: $CdnSelected"
+    ;MessageBox MB_OK "DEBUG: '$CdnSelected/${CHECKSUMS_FILENAME}'"    
+    inetc::get /SILENT /CAPTION "Downloading..." /BANNER "Get files list from $CdnSelected" \
+               "$CdnSelected/${CHECKSUMS_FILENAME}" ${CHECKSUMS_FILENAME} \
                /END
     Pop $R0
     StrCmp $R0 "OK" +3
@@ -140,10 +142,17 @@ Section -Main SEC0000
         ${WordFind} $R2 ${ARCHIVE_EXT} "E+1{" $R0
         IfErrors rarNotFound rarFound
         rarFound:
+            # find each torrent file and escape it
+            ${WordFind} $R2 ".torrent" "E+1{" $R0
+            IfErrors torrentNotFound torrentFound
+            torrentFound:
+                Goto rarNotFound
+            torrentNotFound:
+                ;
             # Downloading file
             DetailPrint "Download: $R2"
             inetc::get /CAPTION $R2 /POPUP "" \
-                       "$CdnUrl/$R2" $R2 \
+                       "$CdnSelected/$R2" $R2 \
                        /END
             Pop $R0
             StrCmp $R0 "OK" +3
@@ -174,7 +183,7 @@ Section -Main SEC0000
                 # Downloading file
                 DetailPrint "Download: $R2"
                 inetc::get /CAPTION "$R2" /POPUP "" \
-                           "$CdnUrl/$R2" $R2 \
+                           "$CdnSelected/$R2" $R2 \
                            /END
                 Pop $R0
                 StrCmp $R0 "OK" +3
@@ -200,30 +209,15 @@ SectionEnd
 
 Function PageChooseMirror
     !insertmacro MUI_HEADER_TEXT "Choose Source Location" "Choose the mirror server closest to you"
-    !insertmacro MUI_INSTALLOPTIONS_DISPLAY "DayZMod-Mirror.ini"
+    ReadINIStr $0 "$PLUGINSDIR\DayZMod.ini" "Mirrors" "Default"
+    ReadINIStr $1 "$PLUGINSDIR\DayZMod.ini" "Mirrors" "List"
+    !insertmacro MUI_INSTALLOPTIONS_WRITE "DayZMod-PageSelectMirror.ini" "Field 1" "State" "$0"
+    !insertmacro MUI_INSTALLOPTIONS_WRITE "DayZMod-PageSelectMirror.ini" "Field 1" "ListItems" "$1"
+    !insertmacro MUI_INSTALLOPTIONS_DISPLAY "DayZMod-PageSelectMirror.ini"
 FunctionEnd
 
 Function PageLeaveChooseMirror
-    !insertmacro MUI_INSTALLOPTIONS_READ $0 "DayZMod-Mirror.ini" "Field 1" "State"
+    !insertmacro MUI_INSTALLOPTIONS_READ $0 "DayZMod-PageSelectMirror.ini" "Field 1" "State"
     ;MessageBox MB_OK "DEBUG: $0"
-    StrCpy $CdnUrl $0
+    StrCpy $CdnSelected $0
 FunctionEnd
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

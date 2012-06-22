@@ -1,10 +1,13 @@
 # DayZ Mod Setup Header functions
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-10
+# @version 2012-06-22
 # @author Arnaud Ligny <arnaud@ligny.org>
 
 Var /GLOBAL ModLastVersionNumber
 Var /GLOBAL ModCurrentVersionNumber
+
+# Macros
+!include DayZMod-Macros.nsh
 
 Function .onVerifyInstDir
     IfFileExists "$INSTDIR\ArmA2OA.exe" +2
@@ -12,69 +15,60 @@ Function .onVerifyInstDir
 FunctionEnd
 
 Function preDetect
-    Call detectArma2CO
+    Call detectArma2OA
     Call detectDayZMod
 FunctionEnd
 
-Function detectArma2CO
+Function detectArma2OA
     ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
-    StrCmp $GamePath "" 0 +3
-        MessageBox MB_OK|MB_ICONSTOP "Can't install DayZ Mod: Arma2 AO not found on your system!"
-        Quit
-FunctionEnd
-
-!define getItemVersionNumber "!insertmacro getItemVersionNumber"
-!macro getItemVersionNumber File Item
-    Push "${File}" ; md5checksums.txt
-    Push "${Item}" ; dayz_code
-    Call getItemVersionNumber
-!macroend
-Function getItemVersionNumber
-    ClearErrors
-    Exch $0
-    Exch
-    Exch $1
-    Push $2
-    ;
-    ;MessageBox MB_OK "DEBUG: $0 / $1"
-    ${LineSum} $1 $7
-    ${ForEach} $9 1 $7 + 1
-        ${LineRead} "$TEMP\${CHECKSUMS_FILENAME}" $9 $R1
-        ${TrimNewLines} $R1 $R1
-        ${WordFind2x} $R1 "$0_v" ".rar" "E+1" $R0
-        IfErrors notFound found
-        found:
-            ;MessageBox MB_OK "DEBUG: $1 / $R0"
-            Return
-        notfound:
-    ${Next}
-    ;
-    Pop $2
-    Pop $1
-    Pop $0
+    StrCmp $GamePath "" 0 detected
+        MessageBox MB_YESNO|MB_ICONQUESTION "ARMA II Operation Arrowhead not found.$\n$\nDo you want to try manually?" IDYES try IDNO quit
+        quit:
+            Quit
+        try:
+        detected:
 FunctionEnd
 
 Function detectDayZMod
-    # Last version
-    inetc::get /CAPTION "Downloading..." /BANNER "Check for update" \
-               "${CDN_URL}/${CHECKSUMS_FILENAME}" "$TEMP\${CHECKSUMS_FILENAME}" \
+    IfFileExists "$INSTDIR\@DayZ\Downloads\${CHECKSUMS_FILENAME}" isInstalled isNotInstalled
+    isInstalled:
+        Call checkForUpdates
+        Return
+    isNotInstalled:
+        ;MessageBox MB_OK|MB_ICONINFORMATION "DayZ Mod not yet installed."
+FunctionEnd
+
+Function checkForUpdates
+    Banner::show /set 76 "Check for updates" "Please wait..."
+    # Get last version number (from default CDN)
+    inetc::get /SILENT /CAPTION "Downloading..." /BANNER "Check for update" \
+               "$CdnUrl/${CHECKSUMS_FILENAME}" "$TEMP\${CHECKSUMS_FILENAME}" \
                /END
+    Pop $R0
+    StrCmp $R0 "OK" OK
+        Banner::destroy
+        BringToFront
+        MessageBox MB_OK|MB_ICONEXCLAMATION "Can't check for updates: Server unavailable"
+        Abort
+    OK:
     ${getItemVersionNumber} "$TEMP\${CHECKSUMS_FILENAME}" "dayz_code"
     StrCpy $ModLastVersionNumber $R0
     StrCpy $R0 ""
-    # Current version
+    # Get current (installed) version number
     ${getItemVersionNumber} "$INSTDIR\@DayZ\Downloads\${CHECKSUMS_FILENAME}" "dayz_code"
     StrCpy $ModCurrentVersionNumber $R0
+    Banner::destroy
+    BringToFront
     # Compare
-    StrCmp $R0 "" NotInstalled 0
     ;MessageBox MB_OK "DEBUG: compare '$ModLastVersionNumber' and '$ModCurrentVersionNumber'"
     ${VersionCompare} $ModLastVersionNumber $ModCurrentVersionNumber $R0
     StrCmp $R0 "0" 0 +3 ; =
-        MessageBox MB_OK "Last version ($ModLastVersionNumber) of DayZ Mod already installed."
-        Return
+        MessageBox MB_YESNO|MB_ICONQUESTION "Last version ($ModLastVersionNumber) of DayZ Mod is already installed.$\n$\nContinue?" IDYES yes IDNO no
+        yes:
+            Return
+        no:
+            Quit
     StrCmp $R0 "1" 0 +3 ; <
         MessageBox MB_OK "New version of DayZ Mod ($ModLastVersionNumber) available."
         Return
-    NotInstalled:
-        ;MessageBox MB_OK "DayZ Mod not yet installed."
 FunctionEnd
