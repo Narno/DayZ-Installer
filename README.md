@@ -20,7 +20,7 @@ Download
 Screenshots
 -----------------------------
 
-![DayZ-Mod-Installer-0.0.1.0.png](http://goo.gl/PzeY5 "DayZ-Mod-Installer-0.0.1.0.png")
+![DayZ-Mod-Installer-0.0.1.2.png](http://goo.gl/5O0z1 "DayZ-Mod-Installer-0.0.1.2.png")
 
 [All screenshots](http://goo.gl/Ru3IT)
 
