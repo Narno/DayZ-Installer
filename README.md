@@ -1,12 +1,12 @@
 DayZ-Installer
 ==============
 
-_DayZ-Installer_ is an installer (and updater) for [DayZ](http://dayzmod.com "DayZ official website") ([ARMA II](http://www.arma2.com "ARMA II official website") Combined Operations Modification).
+_DayZ-Installer_ is an installer (and updater) for [DayZ](http://dayzmod.com "DayZ official website") ([ARMA II](http://www.arma2.com "ARMA II official website"): Combined Operations Modification).
 
 Features
 -----------------------------
 * Online installer (and updater, obviously)
-* Detects Arma2CO (based on Windows Registry, 32 and 64 bits) and its installation directory
+* Detects ARMA II Operation Arrowhead (based on Windows Registry, 32 and 64 bits) and its installation directory
 * Choice of server download mirror
 * Detects the DayZ Mod and compare version with the last avalaible on the [default CDN](http://cdn.armafiles.info)
 * Checks [MD5 sums](http://en.wikipedia.org/wiki/Md5sum) of each [RAR archive](http://cdn.armafiles.info/md5checksums.txt)
