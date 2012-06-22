@@ -15,7 +15,7 @@ Features
 Download
 -----------------------------
 
-**[DayZ-Mod-Installer.exe](http://goo.gl/Sv23d)** (beta 1)
+**[DayZ-Mod-Installer.exe](http://goo.gl/Sv23d)**
 
 Screenshots
 -----------------------------
