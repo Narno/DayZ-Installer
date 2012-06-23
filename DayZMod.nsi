@@ -1,6 +1,6 @@
 # DayZ Mod Setup
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-22
+# @version 2012-06-23
 # @author Arnaud Ligny <arnaud@ligny.org>
 
 Name "DayZ Mod"
@@ -9,7 +9,7 @@ SetCompressor /SOLID lzma
 
 # General Symbol Definitions
 !define OUTFILE "DayZ-Mod-Installer.exe"
-!define VERSION 0.0.1.2
+!define VERSION 0.0.1.3
 !define COMPANY "DayZ Team"
 !define URL http://www.dayzmod.com
 
@@ -17,15 +17,33 @@ SetCompressor /SOLID lzma
 !define CHECKSUMS_FILENAME "md5checksums.txt"
 !define ARCHIVE_EXT        ".rar"
 !define TEXT_EXT           ".txt"
-!define REGPATH32  "SOFTWARE\Bohemia Interactive Studio\ArmA 2 OA"
-!define REGPATH64  "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2 OA"
-!define REGKEYMAIN "main"
+
+# Arma2 Symbol Definitions
+!define STEAM_REGPATH32 "SOFTWARE\Valve\Steam"
+!define STEAM_REGPATH64 "SOFTWARE\Wow6432Node\Valve\Steam"
+!define STEAM_REGKEY    "InstallPath"
+!define STEAM_EXE "Steam.exe"
+!define ARMA2_REGPATH32 "SOFTWARE\Bohemia Interactive Studio\ArmA 2"
+!define ARMA2_REGPATH64 "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2"
+!define ARMA2OA_REGPATH32 "SOFTWARE\Bohemia Interactive Studio\ArmA 2 OA"
+!define ARMA2OA_REGPATH64 "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2 OA"
+!define MAIN_REGKEY "main"
+!define ARMA2OA_EXE "ArmA2OA.exe"
 
 # MUI Symbol Definitions
 !define MUI_ICON "Graphics\Icons\Default.ico"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "Graphics\Bitmaps\WelcomeFinishPage.bmp"
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_RIGHT
 !define MUI_HEADERIMAGE_BITMAP "Graphics\Bitmaps\Header_Right.bmp"
+!define MUI_FINISHPAGE_RUN
+!define MUI_FINISHPAGE_RUN_TEXT "Create desktop shortcut"
+!define MUI_FINISHPAGE_RUN_FUNCTION "CreateDesktopShortcut"
+!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\@DayZ\DayZ_Changelog.txt"
+!define MUI_FINISHPAGE_SHOWREADME_TEXT "Open Changelog"
+!define MUI_FINISHPAGE_SHOWREADME_NOTCHECKED
+!define MUI_FINISHPAGE_LINK "www.dayzmod.com"
+!define MUI_FINISHPAGE_LINK_LOCATION "http://www.dayzmod.com"
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 
 # Included files
@@ -41,10 +59,12 @@ ReserveFile "DayZMod-PageSelectMirror.ini"
 !insertmacro MUI_RESERVEFILE_INSTALLOPTIONS
 
 # Installer pages
+!insertmacro MUI_PAGE_WELCOME
 !define MUI_PAGE_CUSTOMFUNCTION_PRE preDetect
 !insertmacro MUI_PAGE_DIRECTORY
 Page custom PageChooseMirror PageLeaveChooseMirror
 !insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
 
 # Installer languages
 !insertmacro MUI_LANGUAGE English
@@ -65,8 +85,12 @@ VIAddVersionKey CompanyName "${COMPANY}"
 VIAddVersionKey CompanyWebsite "${URL}"
 VIAddVersionKey LegalCopyright "${COMPANY}"
 
-Var /GLOBAL RegPath
-Var /GLOBAL GamePath
+Var /GLOBAL SteamRegPath
+Var /GLOBAL SteamPath
+Var /GLOBAL Arma2RegPath
+Var /GLOBAL Arma2AORegPath
+Var /GLOBAL Arma2Path
+Var /GLOBAL Arma2OAPath
 Var /GLOBAL CdnUrl
 Var /GLOBAL CdnSelected
 
@@ -75,19 +99,24 @@ Var /GLOBAL CdnSelected
 
 # On Init
 Function .onInit   
-    # Windows 32 or 64?
-    IfFileExists $WINDIR\SYSWOW64\*.* Is64bit Is32bit
+    # Define games path
+    Call isWin32or64
+    StrCmp $Win32 "1" Is32bit Is64bit
     Is32bit:
-        SetRegView 32
-        StrCpy $RegPath "${REGPATH32}"
-        GOTO End32Bitvs64BitCheck
+        StrCpy $SteamRegPath "${STEAM_REGPATH32}"
+        StrCpy $Arma2RegPath "${ARMA2_REGPATH32}"
+        StrCpy $Arma2AORegPath "${ARMA2OA_REGPATH32}"
+        Goto End32Bitvs64BitCheck
     Is64bit:
-        SetRegView 64
-        StrCpy $RegPath "${REGPATH64}"
+        StrCpy $SteamRegPath "${STEAM_REGPATH64}"
+        StrCpy $Arma2RegPath "${ARMA2_REGPATH64}"
+        StrCpy $Arma2AORegPath "${ARMA2OA_REGPATH64}"
     End32Bitvs64BitCheck:
-        ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
-        # Set Install Dir
-        StrCpy $INSTDIR "$GamePath"
+    ReadRegStr $SteamPath HKLM "$SteamRegPath" "${STEAM_REGKEY}"
+    ReadRegStr $Arma2Path HKLM "$Arma2RegPath" "${MAIN_REGKEY}"
+    ReadRegStr $Arma2OAPath HKLM "$Arma2AORegPath" "${MAIN_REGKEY}"
+    # Set Install Dir
+    StrCpy $INSTDIR "$Arma2OAPath"
     # Plugins
     InitPluginsDir
     !insertmacro MUI_INSTALLOPTIONS_EXTRACT "DayZMod.ini"
@@ -103,6 +132,10 @@ Section -Main SEC0000
     SetDetailsView show
     SetDetailsPrint both
     SetOutPath "$INSTDIR\@DayZ"
+    File /oname=DayZ.ico "Graphics\Icons\Default.ico"
+    
+    # debug
+    ;Goto byPassDownload
     
     # Installer files
     ;DetailPrint "Extract: 7zip"
@@ -199,12 +232,8 @@ Section -Main SEC0000
         rarEnd:
     ${Next}
     
-    # Create desktop shortcut
-    SetDetailsPrint none
-    SetOutPath "$INSTDIR\@DayZ"
-    File /oname=DayZ.ico "Graphics\Icons\Default.ico"
-    SetDetailsPrint lastused
-    CreateShortCut "$DESKTOP\$(^Name).lnk" "$GamePath\ArmA2OA.exe" "-mod=@DayZ -nosplah" "$INSTDIR\@DayZ\DayZ.ico"
+    # debug
+    ;byPassDownload:
 SectionEnd
 
 Function PageChooseMirror

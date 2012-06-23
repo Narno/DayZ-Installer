@@ -1,31 +1,53 @@
 # DayZ Mod Setup Header functions
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-22
+# @version 2012-06-23
 # @author Arnaud Ligny <arnaud@ligny.org>
 
+Var /GLOBAL Win32
 Var /GLOBAL ModLastVersionNumber
 Var /GLOBAL ModCurrentVersionNumber
 
 # Macros
 !include DayZMod-Macros.nsh
 
+Function isWin32or64
+    IfFileExists $WINDIR\SYSWOW64\*.* Is64bit Is32bit
+    Is32bit:
+        SetRegView 32
+        StrCpy $Win32 "1"
+        Goto End32Bitvs64BitCheck
+    Is64bit:
+        SetRegView 64
+        StrCpy $Win32 "0"
+    End32Bitvs64BitCheck:
+FunctionEnd
+
 Function .onVerifyInstDir
-    IfFileExists "$INSTDIR\ArmA2OA.exe" +2
+    IfFileExists "$INSTDIR\${ARMA2OA_EXE}" +2
         Abort
 FunctionEnd
 
 Function preDetect
+    Call detectArma2
     Call detectArma2OA
     Call detectDayZMod
 FunctionEnd
 
-Function detectArma2OA
-    ReadRegStr $GamePath HKLM "$RegPath" "${REGKEYMAIN}"
-    StrCmp $GamePath "" 0 detected
-        MessageBox MB_YESNO|MB_ICONQUESTION "ARMA II Operation Arrowhead not found.$\n$\nDo you want to try manually?" IDYES try IDNO quit
+Function detectArma2
+    StrCmp $Arma2Path "" 0 detected
+        MessageBox MB_YESNO|MB_ICONQUESTION "ARMA II not found.$\n$\nDo you want to continue?" IDYES continue IDNO quit
         quit:
             Quit
-        try:
+        continue:
+        detected:
+FunctionEnd
+
+Function detectArma2OA
+    StrCmp $Arma2OAPath "" 0 detected
+        MessageBox MB_YESNO|MB_ICONQUESTION "ARMA II Operation Arrowhead not found.$\n$\nDo you want to continue?" IDYES continue IDNO quit
+        quit:
+            Quit
+        continue:
         detected:
 FunctionEnd
 
@@ -72,3 +94,12 @@ Function checkForUpdates
         MessageBox MB_OK "New version of DayZ Mod ($ModLastVersionNumber) available."
         Return
 FunctionEnd
+
+Function CreateDesktopShortcut
+    ;CreateShortCut "$DESKTOP\$(^Name).lnk" "$Arma2OAPath\${ARMA2OA_EXE}" "-mod=@DayZ -nosplah" "$INSTDIR\@DayZ\DayZ.ico"
+    CreateShortCut "$DESKTOP\$(^Name) - Steam.lnk" "$SteamPath\${STEAM_EXE}" "-applaunch 33930 -mod=$Arma2OAPath;EXPANSION;ca;@dayz -world=Chernarus -nosplah" "$INSTDIR\@DayZ\DayZ.ico"
+FunctionEnd
+
+;Function LaunchDayZModSteam
+;    ExecShell "" "$SteamPath\${STEAM_EXE}" "-applaunch 33930 -mod=$Arma2OAPath;EXPANSION;ca;@dayz -world=Chernarus -nosplah"
+;FunctionEnd
