@@ -1,17 +1,17 @@
 # DayZ Mod Setup
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-23
+# @version 2012-06-26
 # @author Arnaud Ligny <arnaud@ligny.org>
 
 Name "DayZ Mod"
-
 SetCompressor /SOLID lzma
 
 # General Symbol Definitions
 !define OUTFILE "DayZ-Mod-Installer.exe"
-!define VERSION 0.0.1.3
+!define VERSION 0.0.1.4
 !define COMPANY "DayZ Team"
 !define URL http://www.dayzmod.com
+!define DEBUG "0" ; debug mode "0" or "1"
 
 # DayZ Symbol Definitions
 !define CHECKSUMS_FILENAME "md5checksums.txt"
@@ -29,6 +29,7 @@ SetCompressor /SOLID lzma
 !define ARMA2OA_REGPATH64 "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2 OA"
 !define MAIN_REGKEY "main"
 !define ARMA2OA_EXE "ArmA2OA.exe"
+!define ARMA2OA_BETA_PATH "Expansion\beta"
 
 # MUI Symbol Definitions
 !define MUI_ICON "Graphics\Icons\Default.ico"
@@ -85,6 +86,7 @@ VIAddVersionKey CompanyName "${COMPANY}"
 VIAddVersionKey CompanyWebsite "${URL}"
 VIAddVersionKey LegalCopyright "${COMPANY}"
 
+# Global variables
 Var /GLOBAL SteamRegPath
 Var /GLOBAL SteamPath
 Var /GLOBAL Arma2RegPath
@@ -97,7 +99,7 @@ Var /GLOBAL CdnSelected
 # Functions
 !include DayZMod.nsh
 
-# On Init
+# On initialization
 Function .onInit   
     # Define games path
     Call isWin32or64
@@ -126,6 +128,13 @@ Function .onInit
     StrCpy $CdnUrl $0
 FunctionEnd
 
+# Detects installations
+Function preDetect
+    Call detectArma2
+    Call detectArma2OA
+    Call detectDayZMod
+FunctionEnd
+
 # Installer sections
 Section -Main SEC0000
     SetOverwrite on
@@ -134,8 +143,11 @@ Section -Main SEC0000
     SetOutPath "$INSTDIR\@DayZ"
     File /oname=DayZ.ico "Graphics\Icons\Default.ico"
     
-    # debug
-    ;Goto byPassDownload
+    # debug mode on?
+    ${If} ${DEBUG} == "1" 
+        ; escape download steps
+        MessageBox MB_OK|MB_ICONINFORMATION "DEBUG mode ON!"
+    ${Else}
     
     # Installer files
     ;DetailPrint "Extract: 7zip"
@@ -151,7 +163,7 @@ Section -Main SEC0000
     SetOutPath "$INSTDIR\@DayZ\Downloads"
     SetDetailsPrint lastused
     DetailPrint "Get files list from: $CdnSelected"
-    ;MessageBox MB_OK "DEBUG: '$CdnSelected/${CHECKSUMS_FILENAME}'"    
+    ;MessageBox MB_OK "DEBUG: '$CdnSelected/${CHECKSUMS_FILENAME}'"
     inetc::get /SILENT /CAPTION "Downloading..." /BANNER "Get files list from $CdnSelected" \
                "$CdnSelected/${CHECKSUMS_FILENAME}" ${CHECKSUMS_FILENAME} \
                /END
@@ -231,11 +243,16 @@ Section -Main SEC0000
             txtEnd:
         rarEnd:
     ${Next}
-    
-    # debug
-    ;byPassDownload:
+
+    ${EndIf}
+
+    ; back to the default directory for post-processes
+    SetDetailsPrint none
+    SetOutPath $INSTDIR
+    SetDetailsPrint lastused    
 SectionEnd
 
+# Custom pages
 Function PageChooseMirror
     !insertmacro MUI_HEADER_TEXT "Choose Source Location" "Choose the mirror server closest to you"
     ReadINIStr $0 "$PLUGINSDIR\DayZMod.ini" "Mirrors" "Default"
