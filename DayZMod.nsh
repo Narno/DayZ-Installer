@@ -1,6 +1,6 @@
 # DayZ Mod Setup Header functions
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-26
+# @version 2012-07-01
 # @author Arnaud Ligny <arnaud@ligny.org>
 
 Var /GLOBAL Win32
@@ -10,6 +10,7 @@ Var /GLOBAL ModCurrentVersionNumber
 # Macros
 !include DayZMod-Macros.nsh
 
+# Run on Windows 32 or 64 bits?
 Function isWin32or64
     IfFileExists $WINDIR\SYSWOW64\*.* Is64bit Is32bit
     Is32bit:
@@ -22,9 +23,14 @@ Function isWin32or64
     End32Bitvs64BitCheck:
 FunctionEnd
 
+# Verify ARMA II OA install dir
 Function .onVerifyInstDir
     IfFileExists "$INSTDIR\${ARMA2OA_EXE}" +2
         Abort
+FunctionEnd
+
+Function DirectoryLeave
+    Call detectArma2OABeta
 FunctionEnd
 
 # Detects if ARMA II is installed
@@ -35,6 +41,7 @@ Function detectArma2
             Quit
         continue:
         detected:
+        Call detectArma2OA
 FunctionEnd
 
 # Detects if ARMA II Operation Arrowhead is installed
@@ -45,6 +52,25 @@ Function detectArma2OA
             Quit
         continue:
         detected:
+FunctionEnd
+
+# Detects if ARMA II OA beta is installed
+Function detectArma2OABeta
+    IfFileExists "$INSTDIR\${ARMA2OA_BETA_PATH}\${ARMA2OA_BETA_EXE}" isBeta isNotBeta
+    isBeta:
+        ; beta installed: nothing to say
+        StrCpy $Arma2OAisBeta "1"
+        Return
+    isNotBeta:
+        MessageBox MB_OK|MB_ICONINFORMATION "$(^Name) requires ARMA 2 beta patch"
+        ExecShell "open" "http://www.arma2.com/beta-patch.php"
+        MessageBox MB_ABORTRETRYIGNORE|MB_ICONINFORMATION|MB_DEFBUTTON2 "- Click 'Retry' to check beta patch installation$\n$\n- Click 'Abort' to exit installer$\n$\n- Click 'Ignore' to ignore beta patch installation" IDABORT abort IDRETRY retry
+        Goto ignore
+        abort:
+            Quit
+        retry:
+            Call detectArma2OABeta
+        ignore:
 FunctionEnd
 
 # Detects if the DayZ Mod is installed
@@ -95,14 +121,14 @@ FunctionEnd
 
 # Create a desktop shortcut
 Function CreateDesktopShortcut
-    # Classic shortuct
-    ;CreateShortCut "$DESKTOP\$(^Name).lnk" "$Arma2OAPath\${ARMA2OA_EXE}" "-mod=@DayZ -nosplah" "$INSTDIR\@DayZ\DayZ.ico"
-    # Steam shortcut (doesn't works)
-    ;CreateShortCut "$DESKTOP\$(^Name) - Steam.lnk" "$SteamPath\${STEAM_EXE}" "-applaunch 33930 -mod=$Arma2OAPath;EXPANSION;ca;@dayz -world=Chernarus -nosplah" "$INSTDIR\@DayZ\DayZ.ico"
-    # Steam shortcut (need to copy exe from beta directory
-    ;"C:\Jeux\Steam\Steam.exe" -applaunch 33930 "-mod=C:\Jeux\Steam\SteamApps\common\arma 2;Expansion;ca;Expansion\beta;Expansion\beta\Expansion;@dayz" -nosplash -world=Chernaru
-    # Beta shortuct (without Steam overlay)
-    CreateShortCut "$DESKTOP\$(^Name).lnk" "$Arma2OAPath\${ARMA2OA_BETA_PATH}\${ARMA2OA_EXE}" '"-mod=C:\Jeux\Steam\SteamApps\common\arma 2;Expansion;ca;Expansion\beta;Expansion\beta\Expansion;@dayz" -nosplash -world=Chernarus' "$INSTDIR\@DayZ\DayZ.ico"
+    # Classic shortcut
+    ;CreateShortCut "$DESKTOP\$(^Name).lnk" "$INSTDIR\${ARMA2OA_EXE}" "-mod=@DayZ -nosplah -skipintro" "$INSTDIR\@DayZ\DayZ.ico"
+    StrCmp $SteamPath "" 0 createSteamShortcut
+        # Beta shortcut
+        CreateShortCut "$DESKTOP\$(^Name).lnk" "$INSTDIR\${ARMA2OA_BETA_PATH}\${ARMA2OA_EXE}" '"-mod=$Arma2Path;Expansion;ca;Expansion\beta;Expansion\beta\Expansion;@dayz" -nosplash -skipintro -world=Chernarus' "$INSTDIR\@DayZ\DayZ.ico"
+    createSteamShortcut:
+        # Beta shortcut (with Steam, need to copy exe from beta directory to the root)
+        CreateShortCut "$DESKTOP\$(^Name).lnk" "$SteamPath\${STEAM_EXE}" '-applaunch 33930 "-mod=$Arma2Path;Expansion;ca;Expansion\beta;Expansion\beta\Expansion;@dayz" -nosplash -skipintro -world=Chernarus' "$INSTDIR\@DayZ\DayZ.ico"
 FunctionEnd
 
 # DayZ launcher

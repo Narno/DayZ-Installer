@@ -1,6 +1,6 @@
 # DayZ Mod Setup
 # Created with EclipseNSIS and NSIS
-# @version 2012-06-26
+# @version 2012-07-01
 # @author Arnaud Ligny <arnaud@ligny.org>
 
 Name "DayZ Mod"
@@ -8,7 +8,7 @@ SetCompressor /SOLID lzma
 
 # General Symbol Definitions
 !define OUTFILE "DayZ-Mod-Installer.exe"
-!define VERSION 0.0.1.4
+!define VERSION 0.0.1.5
 !define COMPANY "DayZ Team"
 !define URL http://www.dayzmod.com
 !define DEBUG "0" ; debug mode "0" or "1"
@@ -22,14 +22,15 @@ SetCompressor /SOLID lzma
 !define STEAM_REGPATH32 "SOFTWARE\Valve\Steam"
 !define STEAM_REGPATH64 "SOFTWARE\Wow6432Node\Valve\Steam"
 !define STEAM_REGKEY    "InstallPath"
-!define STEAM_EXE "Steam.exe"
-!define ARMA2_REGPATH32 "SOFTWARE\Bohemia Interactive Studio\ArmA 2"
-!define ARMA2_REGPATH64 "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2"
+!define STEAM_EXE       "Steam.exe"
+!define ARMA2_REGPATH32   "SOFTWARE\Bohemia Interactive Studio\ArmA 2"
+!define ARMA2_REGPATH64   "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2"
 !define ARMA2OA_REGPATH32 "SOFTWARE\Bohemia Interactive Studio\ArmA 2 OA"
 !define ARMA2OA_REGPATH64 "SOFTWARE\Wow6432Node\Bohemia Interactive Studio\ArmA 2 OA"
-!define MAIN_REGKEY "main"
-!define ARMA2OA_EXE "ArmA2OA.exe"
+!define MAIN_REGKEY       "main"
+!define ARMA2OA_EXE       "ArmA2OA.exe"
 !define ARMA2OA_BETA_PATH "Expansion\beta"
+!define ARMA2OA_BETA_EXE  "arma2oa.exe"
 
 # MUI Symbol Definitions
 !define MUI_ICON "Graphics\Icons\Default.ico"
@@ -61,7 +62,11 @@ ReserveFile "DayZMod-PageSelectMirror.ini"
 
 # Installer pages
 !insertmacro MUI_PAGE_WELCOME
-!define MUI_PAGE_CUSTOMFUNCTION_PRE preDetect
+!define MUI_PAGE_CUSTOMFUNCTION_PRE preDetect ;DirectoryPre
+!define MUI_PAGE_CUSTOMFUNCTION_LEAVE DirectoryLeave
+;!define MUI_DIRECTORYPAGE_TEXT_TOP "..."
+;!define MUI_DIRECTORYPAGE_TEXT_DESTINATION "..."
+;!define MUI_DIRECTORYPAGE_VERIFYONLEAVE
 !insertmacro MUI_PAGE_DIRECTORY
 Page custom PageChooseMirror PageLeaveChooseMirror
 !insertmacro MUI_PAGE_INSTFILES
@@ -72,11 +77,13 @@ Page custom PageChooseMirror PageLeaveChooseMirror
 
 # Installer attributes
 Outfile "${OUTFILE}"
-BrandingText "Setup created by Narno with NSIS ${NSIS_VERSION}"
+BrandingText "Setup created by Narno with NSIS"
 SpaceTexts none
 CRCCheck on
 XPStyle on
 ShowInstDetails show
+
+# File Properties
 VIProductVersion "${VERSION}"
 VIAddVersionKey FileDescription "DayZ Mod"
 VIAddVersionKey FileVersion "${VERSION}"
@@ -93,6 +100,7 @@ Var /GLOBAL Arma2RegPath
 Var /GLOBAL Arma2AORegPath
 Var /GLOBAL Arma2Path
 Var /GLOBAL Arma2OAPath
+Var /GLOBAL Arma2OAisBeta
 Var /GLOBAL CdnUrl
 Var /GLOBAL CdnSelected
 
@@ -118,7 +126,8 @@ Function .onInit
     ReadRegStr $Arma2Path HKLM "$Arma2RegPath" "${MAIN_REGKEY}"
     ReadRegStr $Arma2OAPath HKLM "$Arma2AORegPath" "${MAIN_REGKEY}"
     # Set Install Dir
-    StrCpy $INSTDIR "$Arma2OAPath"
+    StrCmp $Arma2OAPath "" +2
+    StrCpy $INSTDIR $Arma2OAPath
     # Plugins
     InitPluginsDir
     !insertmacro MUI_INSTALLOPTIONS_EXTRACT "DayZMod.ini"
@@ -131,7 +140,6 @@ FunctionEnd
 # Detects installations
 Function preDetect
     Call detectArma2
-    Call detectArma2OA
     Call detectDayZMod
 FunctionEnd
 
@@ -249,7 +257,13 @@ Section -Main SEC0000
     ; back to the default directory for post-processes
     SetDetailsPrint none
     SetOutPath $INSTDIR
-    SetDetailsPrint lastused    
+    SetDetailsPrint lastused
+    
+    # If Steam (and beta): copy beta EXE to the root
+    StrCmp $Arma2OAisBeta "1" 0 noExeReplace
+        Rename "$INSTDIR\${ARMA2OA_EXE}" "$INSTDIR\${ARMA2OA_EXE}.bck"
+        CopyFiles "$INSTDIR\${ARMA2OA_BETA_PATH}\${ARMA2OA_BETA_EXE}" "$INSTDIR\${ARMA2OA_EXE}"
+    noExeReplace:
 SectionEnd
 
 # Custom pages
