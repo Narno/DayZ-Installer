@@ -108,12 +108,13 @@ Function checkForUpdates
     # Compare
     ;MessageBox MB_OK "DEBUG: compare '$ModLastVersionNumber' and '$ModCurrentVersionNumber'"
     ${VersionCompare} $ModLastVersionNumber $ModCurrentVersionNumber $R0
-    StrCmp $R0 "0" 0 +3 ; =
+    StrCmp $R0 "0" 0 NewVersion ; =
         MessageBox MB_YESNO|MB_ICONQUESTION "Last version ($ModLastVersionNumber) of DayZ Mod is already installed.$\n$\nContinue?" IDYES yes IDNO no
         yes:
             Return
         no:
             Quit
+    NewVersion:
     StrCmp $R0 "1" 0 +3 ; <
         MessageBox MB_OK "New version of DayZ Mod ($ModLastVersionNumber) available."
         Return
