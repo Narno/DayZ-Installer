@@ -15,7 +15,8 @@ Features
 Download
 --------
 
-**[DayZ-Mod-Installer.exe](http://goo.gl/Sv23d)**
+* From [GitHub](https://github.com/Narno/DayZ-Installer/releases)
+* From [Dropbox](https://www.dropbox.com/home/D%C3%A9veloppement/NSIS/DayZ/releases)
 
 Screenshots
 -----------
